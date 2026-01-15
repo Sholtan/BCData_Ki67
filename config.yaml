@@ -1,0 +1,3 @@
+paths:
+  data_root: /home/yeldos/Istanbul/obsidian_vault/work_AITU/IHC/DATASETS/BCData
+  checkpoint_dir: /home/yeldos/Istanbul/obsidian_vault/work_AITU/IHC/projects/bcdata_project/checkpoints
