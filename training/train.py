@@ -3,6 +3,7 @@ import time
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 def train(model, num_epochs, train_loader, test_loader, loss_function, forplot_img=None, optimizer = None, device = 'cuda'):
     print("training start")
@@ -63,6 +64,26 @@ def train(model, num_epochs, train_loader, test_loader, loss_function, forplot_i
 
     print("training done")
     return losses
+
+
+def save_checkpoint(model, optimizer, epoch, loss, loss_f_name, scheduler=None):
+    """
+    Docstring for save_checkpoint
+    Saves a checkpoint of the model and its training parameters.
+    """
+    checkpoint = {
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "optimizer_name": optimizer.___class__.__name__,
+        "epoch": epoch,
+        "loss": loss,
+        "loss_f_name": loss_f_name,
+    }
+    if scheduler:
+        checkpoint["scheduler_state_dict"] = scheduler.state_dict()
+
+    ch_path = "./checkpoints/checkpoint_" + str(epoch) + ".pt"
+    torch.save(checkpoint, ch_path)
 
 
 

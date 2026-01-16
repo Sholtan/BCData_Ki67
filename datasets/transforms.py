@@ -42,8 +42,8 @@ class PointsToGaussianHeatmap:
         yy = yy.to(torch.float32)
 
         for x, y in pts:
-            x = int(torch.round(x).item())
-            y = int(torch.round(y).item())
+            #x = int(torch.round(x).item())     # shouldn't round x and y
+            #y = int(torch.round(y).item())
             g = torch.exp(-((xx - x)**2 + (yy - y)**2) / (2 * self.sigma ** 2))
             heatmap[0] = torch.maximum(heatmap[0], g)
 
