@@ -30,15 +30,19 @@ class BCDataDataset(Dataset):
 
         if split not in self.SUPPORTED_SPLITS:
             raise ValueError(f"Unknown split '{split}'. Must be one of {self.SUPPORTED_SPLITS}")
+
         self.image_dir = self.root / "images" / str(split)
-        self.pos_ann_dir = self.root / "annotations" / str(split) / "positive"
+        pos_ann_dir = self.root / "annotations" / str(split) / "positive"
+        neg_ann_dir = self.root / "annotations" / str(split) / "negative"
+
         if not self.image_dir.exists():
             raise FileNotFoundError(self.image_dir)
+        if not pos_ann_dir.exists():
+            raise FileNotFoundError(pos_ann_dir)
+        if not neg_ann_dir.exists():
+            raise FileNotFoundError(pos_ann_dir)
 
-        if not self.pos_ann_dir.exists():
-            raise FileNotFoundError(self.pos_ann_dir)
-
-        self.samples: List[Tuple[Path, Path]] = self._build_index()
+        self.samples: List[Tuple[Path, Path, Path]] = self._build_index()
 
     def _build_index(self):
         """
@@ -51,11 +55,15 @@ class BCDataDataset(Dataset):
 
         for img_path in image_paths:
             stem = img_path.stem
-            pos_ann_path = self.root / "annotations" / self.split / "positive" / (stem + ".h5")
 
-            if not pos_ann_path.exists():
-                raise FileNotFoundError(f"Missing annotation: {pos_ann_path}")
-            samples.append((img_path, pos_ann_path))
+            pos_ann_path = self.root / "annotations" / self.split / "positive" / (stem + ".h5")
+            neg_ann_path = self.root / "annotations" / self.split / "negative" / (stem + ".h5")
+
+            if not pos_ann_path.exists() or not neg_ann_path.exists():
+                raise FileNotFoundError(f'Missing annotation: "{pos_ann_path}", "{neg_ann_path}"')
+
+            samples.append((img_path, pos_ann_path, neg_ann_path))
+
         return samples
 
     def __len__(self):
@@ -69,35 +77,36 @@ class BCDataDataset(Dataset):
         return coords
 
     def __getitem__(self, idx) -> Any:
-        img_path, pos_ann_path = self.samples[idx]
+        img_path, pos_ann_path, neg_ann_path = self.samples[idx]
 
-        img: np.ndarray | None = cv2.imread(str(img_path))
+        img: np.ndarray | torch.Tensor | None = cv2.imread(str(img_path))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
         img = torch.from_numpy(img).permute(2, 0, 1).contiguous()
         if self.transform:
             img = self.transform(img)
 
-        pts: torch.Tensor = self._load_points(pos_ann_path)
+        pos_pts: torch.Tensor = self._load_points(pos_ann_path)
+        neg_pts: torch.Tensor = self._load_points(neg_ann_path)
 
 
-        heatmap = self.target_transform(pts)
+        pos_heatmap = self.target_transform(pos_pts)
+        neg_heatmap = self.target_transform(neg_pts)
 
-        # print(f"type(img): {type(img)}")
-        # print(f"type(heatmap): {type(heatmap)}")
-        # print(f"type(pts): {type(pts)}")
+        heatmaps = torch.cat([pos_heatmap, neg_heatmap], dim = 0)
 
-
-        return img, heatmap, pts
+        return img, heatmaps, pos_pts, neg_pts
 
 
 def collate_heatmap_points(batch):
-    # batch: list of tuples (img, heatmap, points)
-    imgs, heatmaps, points = zip(*batch)
+    # batch: list of tuples (img, heatmap, pos_pts, neg_pts)
+    imgs, heatmaps, pos_points, neg_points = zip(*batch)
 
     imgs = torch.stack(imgs, dim=0)         # (B,C,H,W)
-    heatmaps = torch.stack(heatmaps, dim=0) # (B,1,h,w)
+
+    heatmaps = torch.stack(heatmaps, dim=0) # (B,2,h,w)
 
     # points stays ragged: list length B, each is (Ni,2)
-    points = list(points)
+    pos_points = list(pos_points)
+    neg_points = list(neg_points)
 
-    return imgs, heatmaps, points
+    return imgs, heatmaps, pos_points, neg_points

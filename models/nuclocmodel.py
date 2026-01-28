@@ -94,10 +94,21 @@ class NucleusLocalizationModel(nn.Module):
             in_channels=[64, 128, 256, 512],  # ResNet-34 C2–C5
             out_channels=256
         )
-        self.heatmap_head = HeatmapHead(in_channels=256)
+
+        self.pos_head = HeatmapHead(in_channels=256)
+        self.neg_head = HeatmapHead(in_channels=256)
 
     def forward(self, x):
+        '''
+        Docstring for forward
+
+        :param x: tensor of images (batch_size, channels, height, width)
+        returns stacked heatmaps (batch_size, 2, heatmap_height, heatmap_width)
+        '''
         c2, c3, c4, c5 = self.backbone(x)
         p2, _, _, _ = self.fpn([c2, c3, c4, c5])
-        heatmap = self.heatmap_head(p2)  # (B, 1, 160, 160)
-        return heatmap
+
+        pos = self.pos_head(p2)  # (B, 1, 160, 160)
+        neg = self.neg_head(p2)  # (B, 1, 160, 160)
+
+        return torch.cat([pos, neg], dim = 1)

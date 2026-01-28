@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-def train(model, num_epochs, train_loader, test_loader, loss_function, forplot_img=None, optimizer = None, device = 'cuda'):
+def train(model, num_epochs, train_loader, val_loader, loss_function, forplot_img=None, optimizer = None, device = 'cuda'):
     print("training start")
     model.to(device)
     losses = []
@@ -22,7 +22,7 @@ def train(model, num_epochs, train_loader, test_loader, loss_function, forplot_i
         model.train()
         print(f"epoch: {epoch}")
         batch_losses = []
-        for imgs, heatmaps, _ in train_loader:
+        for imgs, heatmaps, pos_points, neg_points in train_loader:
             imgs = imgs.to(device, non_blocking=True)
             heatmaps = heatmaps.to(device, non_blocking=True)
 
