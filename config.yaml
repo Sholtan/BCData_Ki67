@@ -1,3 +1,7 @@
 paths:
   data_root: /home/yeldos/Istanbul/obsidian_vault/work_AITU/IHC/DATASETS/BCData
   checkpoint_dir: /home/yeldos/Istanbul/obsidian_vault/work_AITU/IHC/projects/bcdata_project/checkpoints
+
+collab_paths:
+  data_root: /content/drive/MyDrive/BCData
+  checkpoint_dir: /content/BCData_Ki67/checkpoints
