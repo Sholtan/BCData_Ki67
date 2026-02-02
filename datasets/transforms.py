@@ -5,7 +5,7 @@ import numpy as np
 from typing import Optional, Tuple, Union
 
 @dataclass
-class PointsToGaussianHeatmap:
+class PointsToLocalizationHeatmap:
     """
     Gaussian heatmap generator for cell centers.
     The object of this class can be called to generate a heatmap.

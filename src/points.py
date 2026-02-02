@@ -169,3 +169,8 @@ def heatmaps_to_points_batch(
         out.append(refined)
 
     return out  # length B, each is (Ni,2)
+
+
+
+
+

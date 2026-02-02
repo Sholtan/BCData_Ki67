@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-def train(model, num_epochs, train_loader, val_loader, loss_function, forplot_img=None, optimizer = None, device = 'cuda'):
+def train(model, num_epochs, train_loader, val_loader, loss_function, count_metrics, forplot_img=None, optimizer = None, device = 'cuda'):
     print("training start")
     model.to(device)
     losses = []
@@ -26,24 +26,16 @@ def train(model, num_epochs, train_loader, val_loader, loss_function, forplot_im
             imgs = imgs.to(device, non_blocking=True)
             heatmaps = heatmaps.to(device, non_blocking=True)
 
-            #print(f"imgs.shape: {imgs.shape}")            # imgs.shape: torch.Size([6, 640, 640, 3])
-            #print(f"heatmaps.shape: {heatmaps.shape}")    # heatmaps.shape: torch.Size([6, 1, 160, 160])
-
             preds = model(imgs)
-
             loss = loss_function(preds, heatmaps)
 
             optimizer.zero_grad()
-            loss.backward()\
-
-            # for name, param in model.named_parameters():
-            #     if param.grad is None:
-            #         print(name, "→ grad is None")
-            #     else:
-            #         print(name, param.grad.mean().item())
-
+            loss.backward()
             optimizer.step()
+
             batch_losses.append(loss.item())
+
+            count_metrics(preds, heatmaps, pos_points, neg_points)
 
         epoch_loss = sum(batch_losses) / len(batch_losses)
         losses.append(epoch_loss)
