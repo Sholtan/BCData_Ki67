@@ -20,7 +20,7 @@ def train(model, num_epochs, train_loader, val_loader, loss_function, count_metr
 
     for epoch in tqdm(range(num_epochs)):
         model.train()
-        print(f"epoch: {epoch}")
+        print(f"epoch: {epoch}", end=', ')
         batch_losses = []
         for imgs, heatmaps, pos_points, neg_points in train_loader:
             imgs = imgs.to(device, non_blocking=True)
@@ -35,9 +35,10 @@ def train(model, num_epochs, train_loader, val_loader, loss_function, count_metr
 
             batch_losses.append(loss.item())
 
-            count_metrics(preds, heatmaps, pos_points, neg_points)
+            #count_metrics(preds, heatmaps, pos_points, neg_points)
 
         epoch_loss = sum(batch_losses) / len(batch_losses)
+        print(f"epoch_loss: {epoch_loss}")
         losses.append(epoch_loss)
 
         if forplot_img is not None:
