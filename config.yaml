@@ -8,4 +8,4 @@ collab_paths:
 
 h200_paths:
   data_root: /raid/datasets/BCData_yeldos
-  checkpoint_dir: 
+  checkpoint_dir: checkpoints

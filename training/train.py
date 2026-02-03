@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-def train(model, num_epochs, train_loader, val_loader, loss_function, count_metrics, forplot_img=None, optimizer = None, device = 'cuda'):
+def train(model, num_epochs, train_loader, val_loader, loss_function, count_metrics, checkpoint_dir, forplot_img=None, optimizer = None, device = 'cuda'):
     print("training start")
     model.to(device)
     losses = []
@@ -18,11 +18,12 @@ def train(model, num_epochs, train_loader, val_loader, loss_function, count_metr
         )
 
 
-    for epoch in tqdm(range(num_epochs)):
+    #for epoch in tqdm(range(num_epochs)):
+    for epoch in range(num_epochs):
         model.train()
         print(f"epoch: {epoch}", end=', ')
         batch_losses = []
-        for imgs, heatmaps, pos_points, neg_points in train_loader:
+        for imgs, heatmaps, pos_points, neg_points in tqdm(train_loader):
             imgs = imgs.to(device, non_blocking=True)
             heatmaps = heatmaps.to(device, non_blocking=True)
 
@@ -40,6 +41,9 @@ def train(model, num_epochs, train_loader, val_loader, loss_function, count_metr
         epoch_loss = sum(batch_losses) / len(batch_losses)
         print(f"epoch_loss: {epoch_loss}")
         losses.append(epoch_loss)
+
+        if epoch % 10 == 0:
+            save_checkpoint(model, optimizer, epoch, epoch_loss, "heatmap_weighted_mse_loss", checkpoint_dir)
 
         if forplot_img is not None:
             forplot_img = forplot_img.to(device)
@@ -59,7 +63,7 @@ def train(model, num_epochs, train_loader, val_loader, loss_function, count_metr
     return losses
 
 
-def save_checkpoint(model, optimizer, epoch, loss, loss_f_name, scheduler=None):
+def save_checkpoint(model, optimizer, epoch, loss, loss_f_name, checkpoint_dir, scheduler=None):
     """
     Docstring for save_checkpoint
     Saves a checkpoint of the model and its training parameters.
@@ -67,7 +71,7 @@ def save_checkpoint(model, optimizer, epoch, loss, loss_f_name, scheduler=None):
     checkpoint = {
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
-        "optimizer_name": optimizer.___class__.__name__,
+        "optimizer_name": optimizer.__class__.__name__,
         "epoch": epoch,
         "loss": loss,
         "loss_f_name": loss_f_name,
@@ -75,7 +79,7 @@ def save_checkpoint(model, optimizer, epoch, loss, loss_f_name, scheduler=None):
     if scheduler:
         checkpoint["scheduler_state_dict"] = scheduler.state_dict()
 
-    ch_path = "./checkpoints/checkpoint_" + str(epoch) + ".pt"
+    ch_path = checkpoint_dir / f"checkpoint_{epoch}.pt"
     torch.save(checkpoint, ch_path)
 
 
