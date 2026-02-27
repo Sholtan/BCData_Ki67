@@ -86,7 +86,8 @@ class HeatmapHead(nn.Module):
 
 
 
-class NucleusLocalizationModel(nn.Module):
+
+class HybridModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.backbone = ResNet34Backbone(pretrained=True)
@@ -95,20 +96,42 @@ class NucleusLocalizationModel(nn.Module):
             out_channels=256
         )
 
-        self.pos_head = HeatmapHead(in_channels=256)
-        self.neg_head = HeatmapHead(in_channels=256)
+        self.loc_pos_head = HeatmapHead(in_channels=256)
+        self.loc_neg_head = HeatmapHead(in_channels=256)
+
+        self.count_pos_head = HeatmapHead(in_channels=256)
+        self.count_neg_head = HeatmapHead(in_channels=256)
 
     def forward(self, x):
         '''
         Docstring for forward
 
-        :param x: tensor of images (batch_size, channels, height, width)
-        returns stacked heatmaps (batch_size, 2, heatmap_height, heatmap_width)
+        param:
+        x: tensor of images (batch_size, 3, 640, 640)
+        
+        returns:
+        
+        loc_hm: stacked localization heatmaps for positive and negative cells, shape: (B, 2, 160, 160)
+        den_hm: stacked density heatmaps for positive and negative cells, shape: (B, 2, 160, 160)
+        count: positive and negative cell counts, shape: (B, 2)
         '''
         c2, c3, c4, c5 = self.backbone(x)
-        p2, _, _, _ = self.fpn([c2, c3, c4, c5])
+        p2, _, _, _ = self.fpn([c2, c3, c4, c5])   # (B, 256, 160, 160)
 
-        pos = self.pos_head(p2)  # (B, 1, 160, 160)
-        neg = self.neg_head(p2)  # (B, 1, 160, 160)
+        # Localization heatmaps (trained vs H_max targets)
+        loc_pos = self.loc_pos_head(p2)  # (B, 1, 160, 160)
+        loc_neg = self.loc_neg_head(p2)  # (B, 1, 160, 160)
 
-        return torch.cat([pos, neg], dim = 1)
+        # Density heatmaps (trained vs H_sum targets)
+        den_pos = self.count_pos_head(p2)  # (B, 1, 160, 160)
+        den_neg = self.count_neg_head(p2)  # (B, 1, 160, 160)
+
+        loc_hm = torch.cat([loc_pos, loc_neg], dim=1)  # (B, 2, 160, 160)
+        den_hm = torch.cat([den_pos, den_neg], dim=1)  # (B, 2, 160, 160)
+
+        # scalar count from density maps
+        count_pos = den_pos.sum(dim=(2, 3))   # (B, 1)
+        count_neg = den_neg.sum(dim=(2, 3))   # (B, 1)
+        count = torch.cat([count_pos, count_neg], dim=1)   # (B, 2)
+
+        return loc_hm, den_hm, count

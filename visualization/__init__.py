@@ -1,1 +1,1 @@
-from .heatmaps import overlay_heatmap
+from .vis import overlay_heatmap

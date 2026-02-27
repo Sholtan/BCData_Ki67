@@ -2,12 +2,25 @@ import yaml
 from pathlib import Path
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
+
+from tqdm import tqdm
+import numpy as np
+
 from datasets.bcdata import BCDataDataset, collate_heatmap_points
-from datasets.transforms import PointsToLocalizationHeatmap
+from datasets.transforms import PointsToLocalizationHeatmap, PointsToCountHeatmap
+
+
 from visualization import overlay_heatmap
 from training import train
-from models import NucleusLocalizationModel, heatmap_weighted_mse_loss
+
+
+from models.models import HybridModel
+from models.losses import weighted_sigmoid_mse_from_logits, softplus_mse_from_logits, l1_count_from_density_logits
+
 from utils.debug import print_info
+
+
+
 import torch
 torch.manual_seed(42)
 torch.cuda.manual_seed_all(42)
@@ -23,19 +36,19 @@ checkpoint_dir = Path(cfg["h200_paths"]["checkpoint_dir"])
 print(f"data_root: {data_root}")
 print(f"checkpoint_dir: {checkpoint_dir}")
 
-heatmap_generator = PointsToLocalizationHeatmap(out_hw=(160,160), in_hw=(640,640), sigma=2.0)
-
-
+loc_heatmap_generator = PointsToLocalizationHeatmap(out_hw=(160,160), in_hw=(640,640), sigma=2.0)
+count_heatmap_generator = PointsToCountHeatmap(out_hw=(160,160), in_hw=(640,640), sigma=2.0)
 
 dataset = BCDataDataset(root = data_root,
                         split="train",
-                        target_transform = heatmap_generator)
+                        target_loc_transform = loc_heatmap_generator,
+                        target_count_transform = count_heatmap_generator)
 
 
 
 train_loader = DataLoader(
     dataset,
-    batch_size=24,        # choose based on GPU memory (640×640 images are large)
+    batch_size=16,        # choose based on GPU memory (640×640 images are large)
     shuffle=True,
     num_workers=0,       # use 0 if debugging
     pin_memory=True,     # recommended when using GPU
@@ -45,10 +58,88 @@ train_loader = DataLoader(
 
 
 
-model = NucleusLocalizationModel()
+model = HybridModel()
 device = 'cuda'
+model.to(device);
+
+optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=3e-4,
+        weight_decay=1e-2
+        )
+
+m_max = 0.174835
+m_dens = 5.013973e-05
+m_count = 59.171053
+
+eps = 1e-8
+lambda_dens = m_max / (m_dens + eps)
+lambda_count = m_max / (m_count + eps)
 
 
-def count_metrics(preds, heatmaps, pos_points, neg_points):
-    pass
-losses = train(model=model, num_epochs=3, train_loader=train_loader, val_loader=None, loss_function=heatmap_weighted_mse_loss, count_metrics=count_metrics, checkpoint_dir=checkpoint_dir, forplot_img=None)
+Lmax_list = []
+Ldens_list = []
+Lcount_list = []
+
+
+model.train()
+
+n_epochs = 100
+for epoch in range(n_epochs):
+    print(f"epoch: {epoch}", end=', ')
+
+    for img, loc_heatmap, count_heatmap, pos_pts, neg_pts in train_loader:
+        optimizer.zero_grad()
+
+        img = img.to(device)
+        loc_heatmap = loc_heatmap.to(device)
+        count_heatmap = count_heatmap.to(device)
+
+
+        pred_loc_hm, pred_den_hm, pred_count = model(img)
+        pred_den_hm = pred_den_hm.to(device)
+
+        Lmax = weighted_sigmoid_mse_from_logits(pred_logits = pred_loc_hm, target = loc_heatmap)
+        Ldens = softplus_mse_from_logits(pred_logits = pred_den_hm, target = count_heatmap)
+
+        gtN = [(len(tmp1), len(tmp2)) for tmp1, tmp2 in zip(pos_pts, neg_pts)]  # (B, 2)
+
+        gtN = torch.tensor(gtN)
+        gtN = gtN.to(device)
+
+        with torch.no_grad():
+            t_sum = count_heatmap.sum(dim=(2,3))   # (B,2)
+            print("target sum (first 5):", t_sum[:5])
+            print("gtN        (first 5):", gtN[:5])
+
+        Lcount = l1_count_from_density_logits(pred_logits = pred_den_hm, gtN = gtN)
+
+        loss = Lmax + lambda_dens * Ldens + lambda_count * Lcount
+
+
+        Lmax_list.append(Lmax.item())
+        Ldens_list.append(Ldens.item())
+        Lcount_list.append(Lcount.item())
+
+        loss.backward()
+        optimizer.step()
+        break
+
+
+torch.save(model.state_dict(), "./checkpoints/hybrid_01.pt")
+
+with open("Lmax_list.txt", "w", encoding="utf-8") as f:
+    for x in Lmax_list:
+        f.write(f"{x}\n")
+
+
+with open("Ldens_list.txt", "w", encoding="utf-8") as f:
+    for x in Ldens_list:
+        f.write(f"{x}\n")
+
+
+with open("Lcount_list.txt", "w", encoding="utf-8") as f:
+    for x in Lcount_list:
+        f.write(f"{x}\n")
+
+

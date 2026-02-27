@@ -7,5 +7,5 @@ collab_paths:
   checkpoint_dir: /content/BCData_Ki67/checkpoints
 
 h200_paths:
-  data_root: /raid/datasets/BCData_yeldos
+  data_root: /raid/datasets/Yeldos/BCData
   checkpoint_dir: checkpoints

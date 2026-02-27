@@ -20,13 +20,15 @@ class BCDataDataset(Dataset):
     def __init__(self,
                  root: Path,
                  split: str,
-                 target_transform: Callable,
+                 target_loc_transform: Callable,
+                 target_count_transform: Callable,
                  transform: Callable | None = None,
     ):
         self.root = Path(root)
         self.split = split
         self.transform = transform
-        self.target_transform = target_transform
+        self.target_loc_transform = target_loc_transform
+        self.target_count_transform = target_count_transform
 
         if split not in self.SUPPORTED_SPLITS:
             raise ValueError(f"Unknown split '{split}'. Must be one of {self.SUPPORTED_SPLITS}")
@@ -77,6 +79,29 @@ class BCDataDataset(Dataset):
         return coords
 
     def __getitem__(self, idx) -> Any:
+        """
+        Load one sample and convert annotations to two-channel heatmaps.
+
+        Parameters
+        ----------
+        idx : int
+            Sample index in ``self.samples``.
+
+        Returns
+        -------
+        tuple[torch.Tensor (torch.float32), torch.Tensor (torch.float32), torch.Tensor (torch.float32), torch.Tensor (torch.float32)]
+            ``(img, heatmaps, pos_pts, neg_pts)`` where:
+            - ``img`` has shape ``(3, 640, 640)`` and is normalized to ``[0, 1]``.
+            - ``heatmaps`` has shape ``(2, 160, 160)``.
+            - ``pos_pts`` has shape ``(N_pos, 2)``.
+            - ``neg_pts`` has shape ``(N_neg, 2)``.
+
+        Notes
+        -----
+        When batched with ``collate_heatmap_points``, ``pos_points`` and ``neg_points``
+        are lists of length ``B`` (batch size) where each element is a tensor of shape ``(n, 2)``,
+        and ``n`` can differ per element.
+        """
         img_path, pos_ann_path, neg_ann_path = self.samples[idx]
 
         img: np.ndarray | torch.Tensor | None = cv2.imread(str(img_path))
@@ -89,24 +114,31 @@ class BCDataDataset(Dataset):
         neg_pts: torch.Tensor = self._load_points(neg_ann_path)
 
 
-        pos_heatmap = self.target_transform(pos_pts)
-        neg_heatmap = self.target_transform(neg_pts)
+        loc_pos_heatmap = self.target_loc_transform(pos_pts)
+        loc_neg_heatmap = self.target_loc_transform(neg_pts)
 
-        heatmaps = torch.cat([pos_heatmap, neg_heatmap], dim = 0)
 
-        return img, heatmaps, pos_pts, neg_pts
+        count_pos_heatmap = self.target_count_transform(pos_pts)
+        count_neg_heatmap = self.target_count_transform(neg_pts)
+
+
+        loc_heatmap = torch.cat([loc_pos_heatmap, loc_neg_heatmap], dim = 0)
+        count_heatmap = torch.cat([count_pos_heatmap, count_neg_heatmap], dim=0)
+
+        return img, loc_heatmap, count_heatmap, pos_pts, neg_pts
 
 
 def collate_heatmap_points(batch):
-    # batch: list of tuples (img, heatmap, pos_pts, neg_pts)
-    imgs, heatmaps, pos_points, neg_points = zip(*batch)
+    # batch: list of tuples (img, loc_heatmap, count_heatmap, pos_pts, neg_pts)
+    imgs, loc_heatmaps, count_heatmaps, pos_points, neg_points = zip(*batch)
 
     imgs = torch.stack(imgs, dim=0)         # (B,C,H,W)
 
-    heatmaps = torch.stack(heatmaps, dim=0) # (B,2,h,w)
+    loc_heatmaps = torch.stack(loc_heatmaps, dim=0) # (B,2,h,w)
+    count_heatmaps = torch.stack(count_heatmaps, dim=0) # (B,2,h,w)
 
     # points stays ragged: list length B, each is (Ni,2)
     pos_points = list(pos_points)
     neg_points = list(neg_points)
 
-    return imgs, heatmaps, pos_points, neg_points
+    return imgs, loc_heatmaps, count_heatmaps, pos_points, neg_points

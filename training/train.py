@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-def train(model, num_epochs, train_loader, val_loader, loss_function, count_metrics, checkpoint_dir, forplot_img=None, optimizer = None, device = 'cuda'):
+def train(model, num_epochs, save_every_n, train_loader, val_loader, loss_function, count_metrics, checkpoint_dir, forplot_img=None, optimizer = None, device = 'cuda'):
     print("training start")
     model.to(device)
     losses = []
@@ -42,7 +42,7 @@ def train(model, num_epochs, train_loader, val_loader, loss_function, count_metr
         print(f"epoch_loss: {epoch_loss}")
         losses.append(epoch_loss)
 
-        if epoch % 10 == 0:
+        if epoch % save_every_n == 0:
             save_checkpoint(model, optimizer, epoch, epoch_loss, "heatmap_weighted_mse_loss", checkpoint_dir)
 
         if forplot_img is not None:
@@ -81,17 +81,4 @@ def save_checkpoint(model, optimizer, epoch, loss, loss_f_name, checkpoint_dir, 
 
     ch_path = checkpoint_dir / f"checkpoint_{epoch}.pt"
     torch.save(checkpoint, ch_path)
-
-
-
-
-
-
-
-
-
-
-
-
-
 

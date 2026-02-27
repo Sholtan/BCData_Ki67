@@ -4,6 +4,7 @@ import torch
 import numpy as np
 
 def print_info(x, prefix=""):
+    print('\n' + '*'*80)
     if torch.is_tensor(x):
         print(f"{prefix}: torch.Tensor | shape={tuple(x.shape)} | dtype={x.dtype} | device={x.device}")
     elif isinstance(x, np.ndarray):
@@ -14,4 +15,4 @@ def print_info(x, prefix=""):
             print_info(v, prefix=f"{prefix}  [{i}] ")
     else:
         print(f"{prefix}: {type(x)}")
-    print()
+    print('*'*80 + '\n')
