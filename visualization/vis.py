@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-def overlay_heatmap(image, heatmap, alpha=0.4, interpolation=cv2.INTER_LINEAR):
+def overlay_heatmap(image, pred_heatmap, gt_heatmap, alpha=0.4, interpolation=cv2.INTER_LINEAR):
     """
     Overlay a heatmap on top of an image.
 
@@ -21,11 +21,16 @@ def overlay_heatmap(image, heatmap, alpha=0.4, interpolation=cv2.INTER_LINEAR):
     # Accept torch tensors and numpy arrays.
     if hasattr(image, "detach"):
         image = image.detach().cpu().numpy()
-    if hasattr(heatmap, "detach"):
-        heatmap = heatmap.detach().cpu().numpy()
+    if hasattr(pred_heatmap, "detach"):
+        pred_heatmap = pred_heatmap.detach().cpu().numpy()
+    if hasattr(gt_heatmap, "detach"):
+        gt_heatmap = gt_heatmap.detach().cpu().numpy()
+
 
     image = np.asarray(image)
-    heatmap = np.asarray(heatmap)
+    pred_heatmap = np.asarray(pred_heatmap)
+    gt_heatmap = np.asarray(gt_heatmap)
+
 
     if image.ndim != 3:
         raise ValueError(f"image must be 3D (CHW or HWC), got shape {image.shape}")
@@ -33,6 +38,7 @@ def overlay_heatmap(image, heatmap, alpha=0.4, interpolation=cv2.INTER_LINEAR):
         image = np.transpose(image, (1, 2, 0))  # CHW -> HWC
     elif image.shape[2] != 3:
         raise ValueError(f"image must have 3 channels, got shape {image.shape}")
+
 
     # Convert image to uint8 (OpenCV-friendly).
     if np.issubdtype(image.dtype, np.floating):
@@ -44,36 +50,65 @@ def overlay_heatmap(image, heatmap, alpha=0.4, interpolation=cv2.INTER_LINEAR):
     else:
         img = np.clip(image, 0, 255).astype(np.uint8)
 
-    # Use first channel as requested.
-    if heatmap.ndim == 3:
-        hm = heatmap[0]
-    elif heatmap.ndim == 2:
-        hm = heatmap
-    else:
-        raise ValueError(f"heatmap must be 2D or 3D, got shape {heatmap.shape}")
-
-    hm = hm.astype(np.float32)
-    hm = cv2.resize(hm, (img.shape[1], img.shape[0]), interpolation=interpolation)
-    hm = (hm - hm.min()) / (hm.max() - hm.min() + 1e-8)
-    heatmap_color = cv2.applyColorMap((hm * 255).astype(np.uint8), cv2.COLORMAP_JET)
-    overlay_pos = cv2.addWeighted(img, 1.0 - alpha, heatmap_color, alpha, 0)
-
-    hm_neg = heatmap[1]
-    hm_neg = hm_neg.astype(np.float32)
-    hm_neg = cv2.resize(hm_neg, (img.shape[1], img.shape[0]), interpolation=interpolation)
-    hm_neg = (hm_neg - hm_neg.min()) / (hm_neg.max() - hm_neg.min() + 1e-8)
-    heatmap_color_neg = cv2.applyColorMap((hm_neg * 255).astype(np.uint8), cv2.COLORMAP_JET)
-    overlay_neg = cv2.addWeighted(img, 1.0 - alpha, heatmap_color_neg, alpha, 0)
-
-    fig, axes = plt.subplots(1, 3, figsize=(14, 14))
 
 
-    axes[0].imshow(image)
-    axes[0].axis("off")
+    
+    pred_hm_pos = pred_heatmap[0]
+    pred_hm_pos = pred_hm_pos.astype(np.float32)
+    pred_hm_pos = cv2.resize(pred_hm_pos, (img.shape[1], img.shape[0]), interpolation=interpolation)
+    pred_hm_pos = (pred_hm_pos - pred_hm_pos.min()) / (pred_hm_pos.max() - pred_hm_pos.min() + 1e-8)
+    pred_heatmap_color_pos = cv2.applyColorMap((pred_hm_pos * 255).astype(np.uint8), cv2.COLORMAP_JET)
+    pred_overlay_pos = cv2.addWeighted(img, 1.0 - alpha, pred_heatmap_color_pos, alpha, 0)
+
+    pred_hm_neg = pred_heatmap[1]
+    pred_hm_neg = pred_hm_neg.astype(np.float32)
+    pred_hm_neg = cv2.resize(pred_hm_neg, (img.shape[1], img.shape[0]), interpolation=interpolation)
+    pred_hm_neg = (pred_hm_neg - pred_hm_neg.min()) / (pred_hm_neg.max() - pred_hm_neg.min() + 1e-8)
+    pred_heatmap_color_neg = cv2.applyColorMap((pred_hm_neg * 255).astype(np.uint8), cv2.COLORMAP_JET)
+    pred_overlay_neg = cv2.addWeighted(img, 1.0 - alpha, pred_heatmap_color_neg, alpha, 0)
 
 
-    axes[1].imshow(overlay_pos)
-    axes[1].axis("off")
+# **************************************************************************************************************
+    gt_hm_pos = gt_heatmap[0]
+    gt_hm_pos = gt_hm_pos.astype(np.float32)
+    gt_hm_pos = cv2.resize(gt_hm_pos, (img.shape[1], img.shape[0]), interpolation=interpolation)
+    gt_hm_pos = (gt_hm_pos - gt_hm_pos.min()) / (gt_hm_pos.max() - gt_hm_pos.min() + 1e-8)
+    gt_heatmap_color_pos = cv2.applyColorMap((gt_hm_pos * 255).astype(np.uint8), cv2.COLORMAP_JET)
+    gt_overlay_pos = cv2.addWeighted(img, 1.0 - alpha, gt_heatmap_color_pos, alpha, 0)
 
-    axes[2].imshow(overlay_neg)
-    axes[2].axis("off")
+
+    gt_hm_neg = gt_heatmap[1]
+    gt_hm_neg = gt_hm_neg.astype(np.float32)
+    gt_hm_neg = cv2.resize(gt_hm_neg, (img.shape[1], img.shape[0]), interpolation=interpolation)
+    gt_hm_neg = (gt_hm_neg - gt_hm_neg.min()) / (gt_hm_neg.max() - gt_hm_neg.min() + 1e-8)
+    gt_heatmap_color_neg = cv2.applyColorMap((gt_hm_neg * 255).astype(np.uint8), cv2.COLORMAP_JET)
+    gt_overlay_neg = cv2.addWeighted(img, 1.0 - alpha, gt_heatmap_color_neg, alpha, 0)
+# **************************************************************************************************************
+
+
+
+
+    fig, axes = plt.subplots(2, 3, figsize=(12, 10))
+
+    axes[0, 0].imshow(image)
+    axes[0, 0].axis("off")
+    axes[1, 0].imshow(image)
+    axes[1, 0].axis("off")
+
+    axes[0, 1].imshow(gt_overlay_pos)
+    axes[0, 1].axis("off")
+    axes[1, 1].imshow(gt_overlay_neg)
+    axes[1, 1].axis("off")
+
+
+    axes[0, 2].imshow(pred_overlay_pos)
+    axes[0, 2].axis("off")
+    axes[1, 2].imshow(pred_overlay_neg)
+    axes[1, 2].axis("off")
+
+    axes[0, 0].set_title("Input")
+    axes[0, 1].set_title("Ground Truth")
+    axes[0, 2].set_title("Prediction")
+
+    axes[0, 0].set_ylabel("Positive")
+    axes[1, 0].set_ylabel("Negative")

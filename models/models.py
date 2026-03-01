@@ -73,11 +73,11 @@ class HeatmapHead(nn.Module):
         layers = []
         for _ in range(num_convs):
             layers += [
-                nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1),
+                nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1),    # keeps HW same
                 nn.ReLU(inplace=True)
             ]
         self.conv = nn.Sequential(*layers)
-        self.out  = nn.Conv2d(in_channels, 1, kernel_size=1)
+        self.out  = nn.Conv2d(in_channels, 1, kernel_size=1)                      # # keeps HW same
 
     def forward(self, x):
         x = self.conv(x)
@@ -130,8 +130,8 @@ class HybridModel(nn.Module):
         den_hm = torch.cat([den_pos, den_neg], dim=1)  # (B, 2, 160, 160)
 
         # scalar count from density maps
-        count_pos = den_pos.sum(dim=(2, 3))   # (B, 1)
-        count_neg = den_neg.sum(dim=(2, 3))   # (B, 1)
+        count_pos = F.softplus(den_pos).sum(dim=(2,3))
+        count_neg = F.softplus(den_neg).sum(dim=(2,3))
         count = torch.cat([count_pos, count_neg], dim=1)   # (B, 2)
 
         return loc_hm, den_hm, count

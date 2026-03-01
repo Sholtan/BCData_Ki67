@@ -1,7 +1,31 @@
+# import os
+
+# # BLAS / OpenMP
+# os.environ["OMP_NUM_THREADS"] = "1"
+# os.environ["OPENBLAS_NUM_THREADS"] = "1"
+# os.environ["MKL_NUM_THREADS"] = "1"
+# os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+# # OpenCV
+# os.environ["OPENCV_FOR_THREADS_NUM"] = "1"
+
+
+
 import yaml
 from pathlib import Path
 import matplotlib.pyplot as plt
+
+
+import torch
+# torch.set_num_threads(1)
+# torch.set_num_interop_threads(1)
 from torch.utils.data import DataLoader
+
+
+
+
+import cv2
+#cv2.setNumThreads(0)
 
 from tqdm import tqdm
 import numpy as np
@@ -19,9 +43,9 @@ from models.losses import weighted_sigmoid_mse_from_logits, softplus_mse_from_lo
 
 from utils.debug import print_info
 
+from src.weights_init import init_count_head_bias
 
 
-import torch
 torch.manual_seed(42)
 torch.cuda.manual_seed_all(42)
 
@@ -50,7 +74,7 @@ train_loader = DataLoader(
     dataset,
     batch_size=16,        # choose based on GPU memory (640×640 images are large)
     shuffle=True,
-    num_workers=0,       # use 0 if debugging
+    num_workers=4,       # use 0 if debugging
     pin_memory=True,     # recommended when using GPU
     drop_last=True,       # optional, useful for BatchNorm
     collate_fn = collate_heatmap_points
@@ -61,6 +85,11 @@ train_loader = DataLoader(
 model = HybridModel()
 device = 'cuda'
 model.to(device);
+C_pos, C_neg = 50.0, 50.0
+H = W = 160
+
+init_count_head_bias(model.count_pos_head, C_pos, H, W, zero_last_weights=True)
+init_count_head_bias(model.count_neg_head, C_neg, H, W, zero_last_weights=True)
 
 optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -86,7 +115,7 @@ model.train()
 
 n_epochs = 100
 for epoch in range(n_epochs):
-    print(f"epoch: {epoch}", end=', ')
+    print(f"\nepoch: {epoch}", end=', ')
 
     for img, loc_heatmap, count_heatmap, pos_pts, neg_pts in train_loader:
         optimizer.zero_grad()
@@ -107,11 +136,6 @@ for epoch in range(n_epochs):
         gtN = torch.tensor(gtN)
         gtN = gtN.to(device)
 
-        with torch.no_grad():
-            t_sum = count_heatmap.sum(dim=(2,3))   # (B,2)
-            print("target sum (first 5):", t_sum[:5])
-            print("gtN        (first 5):", gtN[:5])
-
         Lcount = l1_count_from_density_logits(pred_logits = pred_den_hm, gtN = gtN)
 
         loss = Lmax + lambda_dens * Ldens + lambda_count * Lcount
@@ -123,22 +147,26 @@ for epoch in range(n_epochs):
 
         loss.backward()
         optimizer.step()
-        break
 
 
-torch.save(model.state_dict(), "./checkpoints/hybrid_01.pt")
+    with torch.no_grad():
+        print(f"pred_count: \n{pred_count}\n\n\n")
 
-with open("Lmax_list.txt", "w", encoding="utf-8") as f:
+version = '_04'
+
+torch.save(model.state_dict(), "./checkpoints/hybrid" + version + ".pt")
+
+with open("loss_log/Lmax_list" + version + ".txt", "w", encoding="utf-8") as f:
     for x in Lmax_list:
         f.write(f"{x}\n")
 
 
-with open("Ldens_list.txt", "w", encoding="utf-8") as f:
+with open("loss_log/Ldens_list" + version + ".txt", "w", encoding="utf-8") as f:
     for x in Ldens_list:
         f.write(f"{x}\n")
 
 
-with open("Lcount_list.txt", "w", encoding="utf-8") as f:
+with open("loss_log/Lcount_list" + version + ".txt", "w", encoding="utf-8") as f:
     for x in Lcount_list:
         f.write(f"{x}\n")
 
