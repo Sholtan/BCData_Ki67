@@ -63,16 +63,23 @@ class BCDataDataset(Dataset):
 
     SUPPORTED_SPLITS = {"train", "validation", "test"}
 
-    def __init__(self,
-                 root: Path,
-                 split: str,
-                 target_loc_transform: Callable,
-                 target_count_transform: Callable,
-                 transform: Callable | None = None,
-    ):
+    def __init__(
+        self,
+        root: Path,
+        split: str,
+        target_loc_transform: Callable,
+        target_count_transform: Callable,
+        transform: Callable | None = None,
+        joint_transform: Callable[[torch.Tensor, torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor, torch.Tensor]] | None = None,
+    ) -> None:
         self.root = Path(root)
         self.split = split
         self.transform = transform
+        # ``joint_transform`` is applied to the image and point annotations
+        # simultaneously (e.g. random rotations).  It must return a tuple
+        # ``(img_tensor, pos_pts, neg_pts)``.  If ``None``, no joint
+        # transformation is applied.
+        self.joint_transform = joint_transform
         self.target_loc_transform = target_loc_transform
         self.target_count_transform = target_count_transform
 
@@ -146,13 +153,21 @@ class BCDataDataset(Dataset):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
         img_tensor = torch.from_numpy(img).permute(2, 0, 1).contiguous()
 
+        # Load point annotations as tensors (shape (N, 2))
+        pos_pts: torch.Tensor = self._load_points(pos_ann_path)
+        neg_pts: torch.Tensor = self._load_points(neg_ann_path)
+
+        # Apply joint transform (e.g. random rotation) before any image‑only
+        # transformation.  This transform must return a new image tensor and
+        # updated point coordinates.  If no joint transform is provided,
+        # ``img_tensor``, ``pos_pts`` and ``neg_pts`` remain unchanged.
+        if self.joint_transform is not None:
+            img_tensor, pos_pts, neg_pts = self.joint_transform(img_tensor, pos_pts, neg_pts)
+
         # Apply image‑only transform if provided.  Use a copy to avoid
         # modifying the original array inadvertently.
         if self.transform is not None:
             img_tensor = self.transform(img_tensor)
-
-        pos_pts: torch.Tensor = self._load_points(pos_ann_path)
-        neg_pts: torch.Tensor = self._load_points(neg_ann_path)
 
         # Generate localisation heatmaps (peak‑normalised) for pos/neg
         loc_pos_heatmap = self.target_loc_transform(pos_pts)

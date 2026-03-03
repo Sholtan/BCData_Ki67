@@ -1,8 +1,6 @@
+from __future__ import annotations
 import torch
 import numpy as np
-
-from __future__ import annotations
-
 import re
 from pathlib import Path
 
