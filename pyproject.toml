@@ -1,2 +1,0 @@
-[tool.pylint.typecheck]
-ignored-modules = ["cv2"]

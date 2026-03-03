@@ -41,7 +41,7 @@ from training import train
 from models.models import HybridModel
 from models.losses import weighted_sigmoid_mse_from_logits, softplus_mse_from_logits, l1_count_from_density_logits
 
-from utils.debug import print_info
+from src.debug import print_info
 
 from src.weights_init import init_count_head_bias
 

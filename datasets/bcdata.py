@@ -45,9 +45,7 @@ class BCDataDataset(Dataset):
             raise FileNotFoundError(pos_ann_dir)
 
         self.samples: List[Tuple[Path, Path, Path]] = self._build_index()
-        with open(split + "samples", "w", encoding="utf-8") as f:
-            for x in self.samples:
-                f.write(f"{x}\n")
+
 
     def _build_index(self):
         """

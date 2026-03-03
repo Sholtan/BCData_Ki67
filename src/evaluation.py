@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from utils.debug import print_info
+from src.debug import print_info
 import numpy as np
 
 
