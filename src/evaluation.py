@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from src.debug import print_info
+from projects.IHC.BCData_Ki67.src.utils import print_info
 import numpy as np
 
 
