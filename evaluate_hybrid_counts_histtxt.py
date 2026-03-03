@@ -45,10 +45,10 @@ checkpoint_dir = Path(cfg["h200_paths"]["checkpoint_dir"])
 DATA_ROOT = Path(cfg["h200_paths"]["data_root"])
 
 # Location of the hybrid model checkpoint to evaluate
-CHECKPOINT_PATH = checkpoint_dir / "hybrid_02.pt"
+CHECKPOINT_PATH = checkpoint_dir / "experiment_1" / "hybrid_mod_epoch100.pt"
 
 # Split to evaluate ('test' recommended)
-SPLIT = 'test'
+SPLIT = 'train'
 
 # Device to run on ('cuda' or 'cpu')
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -275,7 +275,7 @@ def main():
         dataset,
         batch_size=8,  # adjust based on memory
         shuffle=False,
-        num_workers=4,
+        num_workers=8,
         pin_memory=True,
         collate_fn=collate_heatmap_points,
     )
@@ -340,7 +340,7 @@ def main():
                     plt.close()
                     # Compute histogram counts and edges using numpy
                     counts, bin_edges = np.histogram(errs, bins=30)
-                    txt_name = f"hist_{cls}_{strategy_key}_bin{lo}_{hi_str}.txt"
+                    txt_name = SPLIT + f"hist_{cls}_{strategy_key}_bin{lo}_{hi_str}.txt"
                     txt_path = hist_txt_dir / txt_name
                     with open(txt_path, 'w') as f:
                         for i in range(len(counts)):

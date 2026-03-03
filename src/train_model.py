@@ -115,6 +115,7 @@ def main() -> None:
         batch_size=32,
         shuffle=True,
         num_workers=8,
+        persistent_workers=True,
         pin_memory=True,
         drop_last=True,
         collate_fn=collate_heatmap_points,
@@ -207,8 +208,12 @@ def main() -> None:
             )
 
         # Save checkpoint after each epoch (into exp_dir)
-        ckpt_path = exp_dir / f"hybrid_mod_epoch{epoch + 1}.pt"
-        torch.save(model.state_dict(), ckpt_path)
+        if epoch % 20 == 1 and epoch != 0:
+            ckpt_path = exp_dir / f"hybrid_mod_epoch{epoch + 1}.pt"
+            torch.save(model.state_dict(), ckpt_path)
+    
+    ckpt_path = exp_dir / f"hybrid_mod_epoch_latest.pt"
+    torch.save(model.state_dict(), ckpt_path)
 
     # Save final loss logs (into exp_dir/loss_logs)
     loss_dir = exp_dir / "loss_logs"
