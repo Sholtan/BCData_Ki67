@@ -45,10 +45,12 @@ checkpoint_dir = Path(cfg["h200_paths"]["checkpoint_dir"])
 DATA_ROOT = Path(cfg["h200_paths"]["data_root"])
 
 # Location of the hybrid model checkpoint to evaluate
-CHECKPOINT_PATH = checkpoint_dir / "experiment_1" / "hybrid_mod_epoch100.pt"
+model_filename = Path("hybrid_02.pt")
+CHECKPOINT_PATH = checkpoint_dir / model_filename
 
 # Split to evaluate ('test' recommended)
-SPLIT = 'train'
+#SPLIT = 'train'  
+SPLIT = 'test'  
 
 # Device to run on ('cuda' or 'cpu')
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -310,7 +312,7 @@ def main():
 
     # After printing the summary, generate histograms of raw errors and save histogram data.
     # Create directories for histogram images and text files
-    hist_dir = Path('histograms')
+    hist_dir = Path('histograms') / model_filename
     hist_dir.mkdir(exist_ok=True)
     hist_txt_dir = hist_dir / 'txt'
     hist_txt_dir.mkdir(exist_ok=True)

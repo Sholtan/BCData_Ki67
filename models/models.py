@@ -99,9 +99,9 @@ class HybridModel(nn.Module):
     corresponding scalar counts by summing the softplus of the density maps.
     """
     def __init__(self) -> None:
-        super().__init__() ResNet34Backbone(pretrained=True)
-        self.fpn = FPN
-        self.backbone =(in_channels=[64, 128, 256, 512], out_channels=256)
+        super().__init__() 
+        self.fpn = FPN(in_channels=[64, 128, 256, 512], out_channels=256)
+        self.backbone = ResNet34Backbone(pretrained=True)
         # Heads: separate localisation/density for positive and negative classes
         self.loc_pos_head = HeatmapHead(in_channels=256)
         self.loc_neg_head = HeatmapHead(in_channels=256)

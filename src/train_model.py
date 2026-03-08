@@ -42,7 +42,7 @@ from src.utils import create_next_experiment_dir, print_info
 # Adjust these values to tune the training behaviour.
 # -----------------------------------------------------------------------------
 # Standard deviation for Gaussian kernels used in target generation
-SIGMA = 3.0
+SIGMA = 2.0
 
 # Loss weighting factors for density and count losses.  Larger values
 # emphasise the corresponding loss relative to the localisation loss.
@@ -61,12 +61,12 @@ NEG_COUNT_WEIGHT = 2.0
 
 # Calibration factor applied to the predicted negative density before
 # computing the loss.  Empirically compensates for systematic undercounting.
-NEG_DENSITY_SCALE = 1.5
+NEG_DENSITY_SCALE = 1.2
 
 # Initial expected count per class used to initialise count head biases.  If
 # your dataset has a different average, you should update these values.
 EXPECTED_POS_COUNT = 50.0
-EXPECTED_NEG_COUNT = 80.0
+EXPECTED_NEG_COUNT = 50.0
 
 
 def main() -> None:
@@ -112,7 +112,7 @@ def main() -> None:
 
     train_loader = DataLoader(
         dataset,
-        batch_size=32,
+        batch_size=16,
         shuffle=True,
         num_workers=8,
         persistent_workers=True,
@@ -208,7 +208,7 @@ def main() -> None:
             )
 
         # Save checkpoint after each epoch (into exp_dir)
-        if epoch % 20 == 1 and epoch != 0:
+        if epoch % 20 == 19:
             ckpt_path = exp_dir / f"hybrid_mod_epoch{epoch + 1}.pt"
             torch.save(model.state_dict(), ckpt_path)
     

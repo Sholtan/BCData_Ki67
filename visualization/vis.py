@@ -120,7 +120,7 @@ def overlay_save(
     image,
     pred_heatmap,
     gt_heatmap,
-    alpha=0.4,
+    alpha=0.4, 
     interpolation=cv2.INTER_LINEAR,
     save_dir="./",
     prefix="sample",
@@ -319,4 +319,149 @@ def overlay_save(
         "pred_overlay_neg": pred_overlay_neg_rgb,
         "gt_overlay_pos": gt_overlay_pos_rgb,
         "gt_overlay_neg": gt_overlay_neg_rgb,
+    }
+
+
+
+
+
+    
+def overlay_gt(
+    image,
+    gt_heatmap,
+    alpha=0.4,
+    interpolation=cv2.INTER_LINEAR,
+    save_dir="./",
+    prefix="sample",
+    upscale=1,
+    save_format="png",
+    show=False,
+):
+    if hasattr(image, "detach"):
+        image = image.detach().cpu().numpy()
+    if hasattr(gt_heatmap, "detach"):
+        gt_heatmap = gt_heatmap.detach().cpu().numpy()
+
+    image = np.asarray(image)
+    gt_heatmap = np.asarray(gt_heatmap)
+
+    if image.ndim != 3:
+        raise ValueError(
+            f"image must be 3D (CHW or HWC), got shape {image.shape}")
+
+    if image.shape[0] == 3:  # CHW -> HWC
+        image = np.transpose(image, (1, 2, 0))
+    elif image.shape[2] != 3:
+        raise ValueError(
+            f"image must have 3 channels, got shape {image.shape}")
+    
+    if np.issubdtype(image.dtype, np.floating):
+        if image.max() <= 1.0 + 1e-6:
+            image_rgb = (np.clip(image, 0.0, 1.0) * 255.0).astype(np.uint8)
+        else:
+            image_rgb = np.clip(image, 0.0, 255.0).astype(np.uint8)
+    else:
+        image_rgb = np.clip(image, 0, 255).astype(np.uint8)
+
+
+    # For OpenCV overlay operations, convert RGB -> BGR
+    img_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
+
+
+    def make_overlay(base_bgr, hm, alpha, interpolation):
+        hm = hm.astype(np.float32)
+        hm = cv2.resize(
+            hm, (base_bgr.shape[1], base_bgr.shape[0]), interpolation=interpolation)
+        hm = (hm - hm.min()) / (hm.max() - hm.min() + 1e-8)
+        hm_color = cv2.applyColorMap(
+            #(hm * 255).astype(np.uint8), cv2.COLORMAP_JET)  # BGR
+            (hm * 255).astype(np.uint8), cv2.COLORMAP_TURBO)  # BGR
+        overlay_bgr = cv2.addWeighted(
+            base_bgr, 1.0 - alpha, hm_color, alpha, 0)
+        return overlay_bgr
+
+
+    gt_overlay_pos_bgr = make_overlay(
+        img_bgr, gt_heatmap[0], alpha, interpolation)
+    gt_overlay_neg_bgr = make_overlay(
+        img_bgr, gt_heatmap[1], alpha, interpolation)
+    
+
+    gt_overlay_pos_rgb = cv2.cvtColor(gt_overlay_pos_bgr, cv2.COLOR_BGR2RGB)
+    gt_overlay_neg_rgb = cv2.cvtColor(gt_overlay_neg_bgr, cv2.COLOR_BGR2RGB)
+
+    saved_paths = {}
+    if save_dir is not None:
+        os.makedirs(save_dir, exist_ok=True)
+
+        ext = save_format.lower()
+        if ext == "jpeg":
+            ext = "jpg"
+        if ext not in {"png", "jpg"}:
+            raise ValueError("save_format must be 'png', 'jpg', or 'jpeg'")
+
+        def maybe_upscale(img_rgb, factor):
+            if factor == 1:
+                return img_rgb
+            h, w = img_rgb.shape[:2]
+            return cv2.resize(
+                img_rgb, (w * factor, h * factor), interpolation=cv2.INTER_CUBIC
+            )
+
+        image_to_save = maybe_upscale(image_rgb, upscale)
+        gt_pos_to_save = maybe_upscale(gt_overlay_pos_rgb, upscale)
+        gt_neg_to_save = maybe_upscale(gt_overlay_neg_rgb, upscale)
+        panel_to_save = np.concatenate(
+            [image_to_save, gt_pos_to_save, gt_neg_to_save], axis=1
+        )
+
+        jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, 100] if ext == "jpg" else None
+
+        def save_rgb(path, img_rgb):
+            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+            if jpeg_params is None:
+                cv2.imwrite(path, img_bgr)
+            else:
+                cv2.imwrite(path, img_bgr, jpeg_params)
+
+        image_path = os.path.join(save_dir, f"{prefix}_image.{ext}")
+        gt_pos_path = os.path.join(save_dir, f"{prefix}_gt_overlay_pos.{ext}")
+        gt_neg_path = os.path.join(save_dir, f"{prefix}_gt_overlay_neg.{ext}")
+        panel_path = os.path.join(save_dir, f"{prefix}_panel.{ext}")
+
+        save_rgb(image_path, image_to_save)
+        save_rgb(gt_pos_path, gt_pos_to_save)
+        save_rgb(gt_neg_path, gt_neg_to_save)
+        save_rgb(panel_path, panel_to_save)
+
+        saved_paths = {
+            "image_path": image_path,
+            "gt_overlay_pos_path": gt_pos_path,
+            "gt_overlay_neg_path": gt_neg_path,
+            "panel_path": panel_path,
+        }
+
+    if show:
+        fig, axes = plt.subplots(1, 3, figsize=(10, 10), dpi=200)
+
+        axes[0].imshow(image_rgb)
+        axes[0].axis("off")
+        axes[0].set_title("original")
+
+        axes[1].imshow(gt_overlay_pos_rgb)
+        axes[1].axis("off")
+        axes[1].set_title("Ki67+ annotated")
+
+        axes[2].imshow(gt_overlay_neg_rgb)
+        axes[2].axis("off")
+        axes[2].set_title("Ki67- annotated")
+
+        plt.tight_layout()
+        plt.show()
+
+    return {
+        "image": image_rgb,
+        "gt_overlay_pos": gt_overlay_pos_rgb,
+        "gt_overlay_neg": gt_overlay_neg_rgb,
+        **saved_paths,
     }
